@@ -2,34 +2,32 @@
 
 [![Build Status](https://github.com/electerm/electerm-sync/actions/workflows/linux.yml/badge.svg)](https://github.com/electerm/electerm-sync/actions)
 
-Gitee gist API wrapper. [api docs](https://gitee.com/api/v5/swagger#/postV5Gists).
-
 ## Installation
 
 ### Node.js
 
 ```bash
-npm i gitee-client
+npm i electerm-sync
 ```
 
 ## Usage
 
 ```js
-import Gitee from 'gitee-client'
+import ElectermSync from 'gitee-client'
 
-const gc = new Gitee(
-  GITEE_TOKEN
+const gc = new ElectermSync(
+  token
 )
-let r = await gc.get('/v5/gists').catch(console.log)
-expect(r.data.length > 0).toBe(true)
 
+gc.create(data, {})
+gc.update(userId, data, {})
+gc.getOne(userId, {})
+gc.test({})
 ```
 
 ## Test
 
 ```bash
-cp .sample.env .env
-# edit .env fill your github token
 npm run test
 ```
 
