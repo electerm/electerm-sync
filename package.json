@@ -1,12 +1,12 @@
 {
   "name": "electerm-sync",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "electerm sync API wrapper.",
   "author": "ZHAO Xudong <zxdong@gmail.com>",
   "license": "MIT",
   "main": "dist/electerm-sync.js",
   "module": "src/electerm-sync.ts",
-  "types": "dist/electerm-sync",
+  "types": "dist/electerm-sync.d.ts",
   "scripts": {
     "test": "./bin/test",
     "build": "tsc",
@@ -37,6 +37,7 @@
     "typescript": "^5.1.3"
   },
   "files": [
+    "src",
     "dist",
     "LICENSE",
     "README.md"
