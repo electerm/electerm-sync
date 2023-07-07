@@ -1,0 +1,11 @@
+#!/bin/bash
+cd `dirname $0`
+cd ..
+git clone https://github.com/electerm/electerm-sync-server-node.git
+cd electerm-sync-server-node
+npm i
+cp sample.env .env
+node src/server.js &
+cd ..
+TS_NODE_PROJECT=./tsconfig.test.json jest
+
