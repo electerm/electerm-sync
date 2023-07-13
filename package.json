@@ -1,6 +1,6 @@
 {
   "name": "electerm-sync",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "electerm sync API wrapper.",
   "author": "ZHAO Xudong <zxdong@gmail.com>",
   "license": "MIT",
