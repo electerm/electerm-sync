@@ -1,6 +1,6 @@
 {
   "name": "electerm-sync",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "electerm sync API wrapper.",
   "author": "ZHAO Xudong <zxdong@gmail.com>",
   "license": "MIT",
@@ -40,7 +40,8 @@
     "src",
     "dist",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "tsconfig.json"
   ],
   "directories": {
     "test": "test"
