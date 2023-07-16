@@ -1,6 +1,6 @@
 {
   "name": "electerm-sync",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "description": "electerm sync API wrapper.",
   "author": "ZHAO Xudong <zxdong@gmail.com>",
   "license": "MIT",
@@ -9,7 +9,11 @@
   "types": "dist/electerm-sync.d.ts",
   "scripts": {
     "test": "./bin/test",
-    "build": "tsc",
+    "build": "npm run build:commonjs && npm run build:esm",
+    "build:commonjs": "tsc && npm run append-export",
+    "append-export": "echo \"\nmodule.exports = ElectermSync;\" >> dist/electerm-sync.js",
+    "rename": "cp esm/electerm-sync.js dist/electerm-sync.mjs",
+    "build:esm": "tsc -p tsconfig.mjs.json && npm run rename",
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
@@ -18,9 +22,10 @@
   },
   "devDependencies": {
     "@tsconfig/recommended": "^1.0.1",
+    "@types/axios": "^0.14.0",
     "@types/jest": "^29.5.2",
     "@types/jsonwebtoken": "^9.0.2",
-    "@types/node": "^20.4.0",
+    "@types/node": "^20.0.0",
     "axios": "*",
     "dotenv-override-true": "6.2.2",
     "eslint": "^8.44.0",

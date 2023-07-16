@@ -123,5 +123,4 @@ class ElectermSync {
   }
 }
 
-module.exports = ElectermSync
 export default ElectermSync

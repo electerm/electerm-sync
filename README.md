@@ -13,7 +13,8 @@ npm i electerm-sync
 ## Usage
 
 ```js
-import ElectermSync from 'gitee-client'
+import ElectermSync from 'electerm-sync'
+const ElectermSync = require('electerm-sync')
 
 const gc = new ElectermSync(
   token
