@@ -1,6 +1,6 @@
 {
   "name": "electerm-sync",
-  "version": "1.1.1",
+  "version": "1.2.1",
   "description": "electerm sync API wrapper.",
   "author": "ZHAO Xudong <zxdong@gmail.com>",
   "license": "MIT",
@@ -8,7 +8,7 @@
   "module": "dist/electerm-sync.mjs",
   "types": "dist/electerm-sync.d.ts",
   "scripts": {
-    "test": "./bin/test",
+    "test": "TS_NODE_PROJECT=./tsconfig.test.json jest",
     "build": "npm run build:commonjs && npm run build:esm",
     "build:commonjs": "tsc && npm run append-export",
     "append-export": "echo \"\nmodule.exports = ElectermSync;\" >> dist/electerm-sync.js",

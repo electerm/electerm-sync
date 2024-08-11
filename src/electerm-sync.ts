@@ -37,7 +37,7 @@ class ElectermSync {
     const [
       token,
       server,
-      userId,
+      userId = '',
       algorithm = 'HS256'
     ] = str.split('####')
     this.token = token
@@ -113,10 +113,12 @@ class ElectermSync {
   }
 
   _authHeader () {
-    const tk = sign({
-      id: this.userId,
-      exp: Date.now() + 1000000
-    }, this.token, { algorithm: this.algorithm })
+    const tk = this.userId !== ''
+      ? sign({
+        id: this.userId,
+        exp: Date.now() + 1000000
+      }, this.token, { algorithm: this.algorithm })
+      : this.token
     return {
       Authorization: `Bearer ${tk}`
     }
