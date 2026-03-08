@@ -1,6 +1,7 @@
-interface ConfigBase {
+export interface Config {
   url?: string
-  headers?: Object
+  method?: string
+  data?: any
+  headers?: any
+  [key: string]: any
 }
-
-export type Config = Record<string, any | ConfigBase>

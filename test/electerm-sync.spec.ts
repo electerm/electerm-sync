@@ -1,70 +1,127 @@
-import ElectermSync from '../src/electerm-sync'
-import { readFileSync } from 'fs'
+import { expect, test, describe } from 'vitest'
+import axios from 'axios'
+import { electermSync } from '../src/electerm-sync'
 
-describe('ElectermSync', () => {
-  const tk = readFileSync(
-    process.cwd() + '/electerm-sync-server-node/.env'
-  ).toString()
-  const arr = tk.split('\n')
-  let sec = arr.find(p => p.startsWith('JWT_SECRET')) || ''
-  sec = sec.slice(11)
-  let uid = arr.find(p => p.startsWith('JWT_USERS')) || ''
-  uid = uid.slice(10).split(',')[0]
-  const token = [
-    sec,
-    'http://127.0.0.1:7837/api/sync',
-    uid
-  ].join('####')
-  const electermSync = new ElectermSync(token)
-  const dataSample = { someKey: 'someValue' }
-  const dataUpdate = { someKey: 'newValue' }
-  describe('create', () => {
-    it('should create data', async () => {
-      const response = await electermSync.create(dataSample, {})
+describe('electermSync', () => {
+  const axiosInstance = axios.create()
 
-      expect(response.status).toBe(200)
-      // Add more expect() statements to check response data
+  const githubToken = process.env.GITHUB_TOKEN || ''
+  const giteeToken = process.env.GITEE_TOKEN || ''
+
+  const customSyncToken = `${process.env.CUSTOM_SYNC_SERVER_SECRET}####${process.env.CUSTOM_SYNC_SERVER_USERNAME}####${process.env.CUSTOM_SYNC_SERVER_URL}`
+  const cloudSyncToken = `${process.env.ELECTERM_CLOUD_SECRET}####${process.env.ELECTERM_CLOUD_URL}`
+
+  const gistData = {
+    description: 'sync electerm data test',
+    files: { 'placeholder.js': { content: 'console.log("test")' } },
+    public: false
+  }
+
+  let githubGistId = ''
+  let giteeGistId = ''
+
+  // =============== GITHUB ===============
+  describe('GitHub Sync', () => {
+    test('test', async () => {
+      const res = await electermSync(axiosInstance, 'github', 'test', [], githubToken)
+      expect(Array.isArray(res)).toBe(true)
+    })
+
+    test('create', async () => {
+      const res = await electermSync(axiosInstance, 'github', 'create', [gistData], githubToken)
+      expect(res.id).toBeDefined()
+      githubGistId = res.id
+    })
+
+    test('update', async () => {
+      expect(githubGistId).toBeTruthy()
+      const updateData = {
+        description: 'sync electerm data test updated',
+        files: { 'placeholder.js': { content: 'console.log("test updated")' } }
+      }
+      const res = await electermSync(axiosInstance, 'github', 'update', [githubGistId, updateData], githubToken)
+      expect(res.description).toBe('sync electerm data test updated')
+    })
+
+    test('getOne', async () => {
+      expect(githubGistId).toBeTruthy()
+      const res = await electermSync(axiosInstance, 'github', 'getOne', [githubGistId], githubToken)
+      expect(res.id).toBe(githubGistId)
     })
   })
 
-  describe('getOne', () => {
-    it('get user data 1', async () => {
-      const response = await electermSync.getOne(uid, {})
+  // =============== GITEE ===============
+  describe('Gitee Sync', () => {
+    test('test', async () => {
+      // Gitee might return array of gists or throws if invalid
+      const res = await electermSync(axiosInstance, 'gitee', 'test', [], giteeToken)
+      expect(Array.isArray(res)).toBe(true)
+    })
 
-      expect(response.status).toBe(200)
-      expect(response.data.someKey).toBe(dataSample.someKey)
-      // Add more expect() statements to check response data
+    test('create', async () => {
+      const res = await electermSync(axiosInstance, 'gitee', 'create', [gistData], giteeToken)
+      expect(res.id).toBeDefined()
+      giteeGistId = res.id
+    })
+
+    test('update', async () => {
+      expect(giteeGistId).toBeTruthy()
+      const updateData = {
+        description: 'sync electerm data test updated',
+        files: { 'placeholder.js': { content: 'console.log("test updated")' } }
+      }
+      const res = await electermSync(axiosInstance, 'gitee', 'update', [giteeGistId, updateData], giteeToken)
+      expect(res.description).toBe('sync electerm data test updated')
+    })
+
+    test('getOne', async () => {
+      expect(giteeGistId).toBeTruthy()
+      const res = await electermSync(axiosInstance, 'gitee', 'getOne', [giteeGistId], giteeToken)
+      expect(res.id).toBe(giteeGistId)
     })
   })
 
-  describe('update', () => {
-    it('should update data for a user', async () => {
-      const response = await electermSync.update(uid, dataUpdate, {})
+  // =============== CUSTOM ===============
+  describe('Custom Sync', () => {
+    test('test', async () => {
+      const res = await electermSync(axiosInstance, 'custom', 'test', [], customSyncToken)
+      expect(res).toBeDefined()
+    })
 
-      expect(response.status).toBe(200)
-      // Add more expect() statements to check response data
+    test('update', async () => {
+      const userId = process.env.CUSTOM_SYNC_SERVER_URL || 'username1'
+      const updateData = {
+        raw: 'somedata'
+      }
+      const res = await electermSync(axiosInstance, 'custom', 'update', [userId, updateData], customSyncToken)
+      expect(res).toBeDefined()
+    })
+
+    test('getOne', async () => {
+      const userId = process.env.CUSTOM_SYNC_SERVER_URL || 'username1'
+      const res = await electermSync(axiosInstance, 'custom', 'getOne', [userId], customSyncToken)
+      expect(res).toBeDefined()
     })
   })
 
-  describe('getOne1', () => {
-    it('get user data 2', async () => {
-      const response = await electermSync.getOne(uid, {})
+  // =============== CLOUD ===============
+  describe('Cloud Sync', () => {
+    test('test', async () => {
+      const res = await electermSync(axiosInstance, 'cloud', 'test', [''], cloudSyncToken)
+      expect(res).toBeDefined()
+    }, 10000)
 
-      expect(response.status).toBe(200)
-      expect(response.data.someKey).toBe(dataUpdate.someKey)
-      // Add more expect() statements to check response data
-    })
+    test('update', async () => {
+      const updateData = {
+        raw: 'somedata_cloud'
+      }
+      const res = await electermSync(axiosInstance, 'cloud', 'update', ['', updateData], cloudSyncToken)
+      expect(res).toBeDefined()
+    }, 10000)
+
+    test('getOne', async () => {
+      const res = await electermSync(axiosInstance, 'cloud', 'getOne', [''], cloudSyncToken)
+      expect(res).toBeDefined()
+    }, 10000)
   })
-
-  describe('test api', () => {
-    it('test api should work', async () => {
-      const response = await electermSync.test({})
-
-      expect(response.status).toBe(200)
-      expect(response.data).toBe('test ok')
-      // Add more expect() statements to check response data
-    })
-  })
-
-  // Add more test cases for the rest of the methods
 })
