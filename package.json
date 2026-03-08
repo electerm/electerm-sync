@@ -35,8 +35,7 @@
   "files": [
     "dist",
     "LICENSE",
-    "README.md",
-    "tsconfig.json"
+    "README.md"
   ],
   "directories": {
     "test": "test"
