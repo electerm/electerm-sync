@@ -31,27 +31,32 @@ describe('sanitizeConfig / circular reference handling', () => {
     expect(err.message).toContain('status: 401')
     expect(err.message).toContain('Unauthorized')
     expect(err.message).toContain('Bad credentials')
-    expect(err.message).toContain('config:')
+    // the request config must NOT be dumped into the message: it carries the
+    // Authorization header and, on a failed sync upload, the whole payload
+    expect(err.message).not.toContain('config:')
+    expect(err.message).not.toContain('token abc')
 
     // The stored config should have httpsAgent stripped
     expect((err.config as any).httpsAgent).toBeUndefined()
     // But other keys should be preserved
     expect(err.config.url).toBe('https://api.github.com/gists')
     expect(err.config.method).toBe('GET')
+    // Sensitive headers are redacted in the stored config too
+    expect(err.config.headers).toEqual({ Authorization: '[redacted]' })
   })
 
-  test('HTTPError with clean config still preserves all keys', () => {
+  test('HTTPError with clean config still preserves non-sensitive keys', () => {
     const config = {
       url: 'https://api.github.com/gists',
       method: 'GET',
-      headers: { Authorization: 'token abc' }
+      headers: { Authorization: 'token abc', 'Content-Type': 'application/json' }
     }
 
     const err = new HTTPError(200, 'OK', {}, config)
 
     expect(err.config.url).toBe('https://api.github.com/gists')
     expect(err.config.method).toBe('GET')
-    expect(err.config.headers).toEqual({ Authorization: 'token abc' })
+    expect(err.config.headers).toEqual({ Authorization: '[redacted]', 'Content-Type': 'application/json' })
   })
 
   test('HTTPError with null/undefined config does not throw', () => {
@@ -196,8 +201,9 @@ describe('sanitizeConfig / circular reference handling', () => {
     expect(err.config.method).toBe('POST')
     expect((err.config as any).timeout).toBe(5000)
 
-    // Core object keys are preserved (round-tripped through JSON)
-    expect(err.config.headers).toEqual({ Authorization: 'token abc', 'Content-Type': 'application/json' })
+    // Core object keys are preserved (round-tripped through JSON),
+    // with sensitive header values redacted
+    expect(err.config.headers).toEqual({ Authorization: '[redacted]', 'Content-Type': 'application/json' })
     expect(err.config.data).toEqual({ description: 'my gist', files: { 'a.txt': { content: 'hello' } } })
 
     // Non-core objects are stripped — even safe ones
@@ -273,5 +279,64 @@ describe('sanitizeConfig / circular reference handling', () => {
     }
 
     vi.restoreAllMocks()
+  })
+})
+
+describe('HTTPError message content', () => {
+  test('a failed cloud sync upload does not leak the JWT or the ciphertext body', () => {
+    // reproduces the production report: PUT /api/sync with a sync password
+    // failed with 500 and the error dialog showed the whole axios dump,
+    // including the Authorization JWT and the 200KB encrypted payload
+    const config = {
+      url: 'https://sync.electerm.org/api/sync',
+      method: 'PUT',
+      headers: {
+        Accept: 'application/json, text/plain, */*',
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IlJQRlNVRlBjZ3lROVVEWjRYZzhrTyJ9.secret',
+        'X-User-Agent': 'electerm-sync/v2.0.0'
+      },
+      data: `{"description":"sync electerm data","files":{"bookmarks.json":{"content":"gcm:${'ab'.repeat(100000)}"}}}`
+    }
+
+    const err = new HTTPError(500, 'Internal Server Error', {
+      error: { code: '500', message: 'A server error has occurred' }
+    }, config)
+
+    expect(err.message).toContain('status: 500')
+    expect(err.message).toContain('A server error has occurred')
+    expect(err.message).not.toContain('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9')
+    expect(err.message).not.toContain('gcm:abab')
+    expect(err.message).not.toContain('config:')
+    expect(err.message.length).toBeLessThan(200)
+    // stored config stays redacted and serializable
+    expect((err.config.headers as any).Authorization).toBe('[redacted]')
+    expect(() => JSON.stringify(err.config)).not.toThrow()
+  })
+
+  test('extracts the message from the { error: { message } } envelope', () => {
+    const err = new HTTPError(413, 'Payload Too Large', {
+      error: { code: '413', message: 'sync data too large, max 280KB' }
+    }, { url: 'https://sync.electerm.org/api/sync' })
+
+    expect(err.message).toContain('status: 413')
+    expect(err.message).toContain('Payload Too Large')
+    expect(err.message).toContain('data: sync data too large, max 280KB')
+  })
+
+  test('plain-text server bodies are shown verbatim', () => {
+    const err = new HTTPError(404, 'Not Found', '404 not found', {})
+    expect(err.message).toContain('data: 404 not found')
+  })
+
+  test('very long server messages are truncated with a length hint', () => {
+    const err = new HTTPError(500, 'Internal Server Error', 'x'.repeat(5000), {})
+    expect(err.message.length).toBeLessThan(500)
+    expect(err.message).toContain('5000 chars')
+  })
+
+  test('empty object bodies add no data line', () => {
+    const err = new HTTPError(200, 'OK', {}, {})
+    expect(err.message).toBe('status: 200\nstatusText: OK')
   })
 })

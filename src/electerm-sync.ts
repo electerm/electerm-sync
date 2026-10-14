@@ -14,8 +14,22 @@ import { type Config } from './types'
  *   - All other object / function / symbol values are ignored.
  * This guarantees the result is always JSON-serializable regardless
  * of what axios puts into the config.
+ *
+ * Header values matching SENSITIVE_HEADERS (case-insensitively) are
+ * redacted: HTTPError instances end up in UI dialogs and logs, and the
+ * Authorization header carries the user's cloud JWT / GitHub token.
  */
 const CORE_OBJECT_KEYS = ['headers', 'data']
+const SENSITIVE_HEADERS = ['authorization', 'cookie', 'proxy-authorization', 'x-auth-token', 'x-api-key']
+const REDACTED = '[redacted]'
+
+function redactHeaders (headers: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = {}
+  for (const key of Object.keys(headers)) {
+    out[key] = SENSITIVE_HEADERS.includes(key.toLowerCase()) ? REDACTED : headers[key]
+  }
+  return out
+}
 
 function sanitizeConfig (config: any): Config {
   if (config === null || config === undefined || typeof config !== 'object') {
@@ -29,7 +43,8 @@ function sanitizeConfig (config: any): Config {
       safe[key] = value
     } else if (CORE_OBJECT_KEYS.includes(key) && value !== null && type === 'object') {
       try {
-        safe[key] = JSON.parse(JSON.stringify(value))
+        const cloned = JSON.parse(JSON.stringify(value))
+        safe[key] = key === 'headers' ? redactHeaders(cloned) : cloned
       } catch {
         // Even a core object key may contain circular refs — skip it.
       }
@@ -39,16 +54,55 @@ function sanitizeConfig (config: any): Config {
   return safe as Config
 }
 
+/**
+ * Server error bodies arrive in several shapes: { error: { message } },
+ * { message }, or plain text. Pull out the human-readable part and cap its
+ * length — a failed sync upload carries the whole 200KB+ request body as
+ * `data`, which would otherwise flood the error dialog.
+ */
+const MAX_SERVER_MESSAGE = 300
+
+function serverMessage (data: any): string {
+  if (data === null || data === undefined) {
+    return ''
+  }
+  let msg = ''
+  if (typeof data === 'string') {
+    msg = data
+  } else if (typeof data === 'object') {
+    const err = (data as any).error
+    if (err !== null && err !== undefined && typeof err === 'object' && typeof err.message === 'string') {
+      msg = err.message
+    } else if (typeof (data as any).message === 'string') {
+      msg = (data as any).message
+    } else if (Object.keys(data as object).length > 0) {
+      try {
+        msg = JSON.stringify(data)
+      } catch {
+        msg = ''
+      }
+    }
+  } else {
+    msg = String(data)
+  }
+  msg = msg.trim()
+  if (msg.length > MAX_SERVER_MESSAGE) {
+    msg = msg.slice(0, MAX_SERVER_MESSAGE) + `... (${msg.length} chars)`
+  }
+  return msg
+}
+
 export class HTTPError extends Error {
   status: number
   statusText: string
   data: Object
   config: Config
   constructor (status: number, statusText: string, data: Object, config: Config) {
-    super(`status: ${status}
-statusText: ${statusText}
-data: ${JSON.stringify(data, null, 2)}
-config: ${JSON.stringify(sanitizeConfig(config), null, 2)}`)
+    // Keep the message short and credential-free: status, statusText and the
+    // server's own message only. The request config (with its Authorization
+    // header and full payload) stays available on `.config`, redacted.
+    const detail = serverMessage(data)
+    super(`status: ${status}\nstatusText: ${statusText}${detail === '' ? '' : `\ndata: ${detail}`}`)
     this.status = status
     this.statusText = statusText
     this.data = data
